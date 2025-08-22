@@ -6,6 +6,7 @@ It also includes an interactive Streamlit app to test the model on random test i
 
 
 📂 Project Structure
+
 .
 ├── app.py                       # Streamlit app
 ├── cifar-10-cnn-project.ipynb   # Project code
