@@ -1,52 +1,72 @@
 import streamlit as st
 import numpy as np
-from PIL import Image
 import tensorflow as tf
+from tensorflow.keras.models import load_model
+from tensorflow.keras.datasets import cifar10
+from PIL import Image
+import matplotlib.pyplot as plt
 
-# CIFAR-10 labels
-CLASS_NAMES = [
+# Load model
+model = load_model("model.h5")
+
+# CIFAR-10 class names
+class_names = [
     "airplane", "automobile", "bird", "cat", "deer",
     "dog", "frog", "horse", "ship", "truck"
 ]
 
-# Load model once & cache
-@st.cache_resource
-def load_model():
-    return tf.keras.models.load_model("model.h5", compile=False)
+st.title("CIFAR-10 Image Classification 🚀")
+st.write("Upload an image or test with sample CIFAR-10 dataset")
 
-model = load_model()
+# --- Upload Image Section ---
+uploaded_file = st.file_uploader("Upload an image (32x32)", type=["png", "jpg", "jpeg"])
+if uploaded_file is not None:
+    image = Image.open(uploaded_file).resize((32, 32))
+    img_array = np.array(image) / 255.0
+    img_input = np.expand_dims(img_array, axis=0)
 
-st.title("🚀 CIFAR-10 Image Classifier")
-st.write("Upload an image (32x32 CIFAR-10 style) and the model will predict its class.")
+    prediction = model.predict(img_input)
+    predicted_label = class_names[np.argmax(prediction)]
+    confidence = np.max(prediction) * 100
 
-# Allow multiple uploads
-uploaded_files = st.file_uploader(
-    "Choose image(s)...", type=["jpg", "jpeg", "png"], accept_multiple_files=True
-)
+    st.image(image, caption=f"Prediction: {predicted_label} ({confidence:.2f}%)")
+    st.success(f"Predicted Class: {predicted_label} with {confidence:.2f}% confidence")
 
-if uploaded_files:
-    # Show all uploaded images
-    for idx, uploaded_file in enumerate(uploaded_files):
-        st.write(f"### Image {idx+1}")
-        image = Image.open(uploaded_file).convert("RGB").resize((32, 32))
-        st.image(image, caption="Uploaded Image", use_container_width=True)
+# --- Test with CIFAR-10 Dataset ---
+st.subheader("🔍 Test with CIFAR-10 Sample Images")
 
-    # Ask which image to classify
-    option = st.selectbox(
-        "Select an image to classify:",
-        options=[f"Image {i+1}" for i in range(len(uploaded_files))]
-    )
+if st.button("Load 10 Random CIFAR-10 Images"):
+    # Load CIFAR-10 test data
+    (_, _), (x_test, y_test) = cifar10.load_data()
+    x_test = x_test.astype("float32") / 255.0
 
-    selected_index = int(option.split()[1]) - 1
-    selected_image = Image.open(uploaded_files[selected_index]).convert("RGB").resize((32, 32))
+    # Pick 10 random indices
+    indices = np.random.choice(len(x_test), 10, replace=False)
+    st.session_state.sample_images = x_test[indices]
+    st.session_state.sample_labels = y_test[indices]
 
-    # Preprocess
-    img_array = np.array(selected_image).astype("float32") / 255.0
-    img_array = np.expand_dims(img_array, axis=0)
+if "sample_images" in st.session_state:
+    # Display images in a grid
+    st.write("Here are 10 random test images from CIFAR-10:")
+    cols = st.columns(5)
+    for i, img in enumerate(st.session_state.sample_images):
+        with cols[i % 5]:
+            st.image(img, caption=f"Index {i}", use_container_width=True)
+
+    # Pick one image to test
+    idx = st.slider("Select image index to check (0-9)", 0, 9, 0)
+    img = st.session_state.sample_images[idx]
+    true_label = class_names[st.session_state.sample_labels[idx][0]]
 
     # Predict
-    prediction = model.predict(img_array)
-    predicted_class = CLASS_NAMES[np.argmax(prediction)]
+    img_input = np.expand_dims(img, axis=0)
+    prediction = model.predict(img_input)
+    predicted_label = class_names[np.argmax(prediction)]
+    confidence = np.max(prediction) * 100
 
-    st.subheader(f"Prediction: **{predicted_class}**")
-    st.bar_chart(prediction[0])
+    # Show results
+    st.image(img, caption=f"True: {true_label} | Pred: {predicted_label} ({confidence:.2f}%)")
+    if true_label == predicted_label:
+        st.success("✅ Correct Prediction!")
+    else:
+        st.error("❌ Wrong Prediction!")
