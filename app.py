@@ -12,12 +12,46 @@ from tensorflow import keras
 # -------------------------------
 st.set_page_config(page_title="CIFAR-10 Classifier", layout="wide")
 
-CLASS_NAMES = [
+import streamlit as st
+import numpy as np
+from PIL import Image
+import tensorflow as tf
+
+# Load CIFAR-10 labels
+class_names = [
     "airplane", "automobile", "bird", "cat", "deer",
     "dog", "frog", "horse", "ship", "truck"
 ]
 
-MODEL_PATH = os.getenv("MODEL_PATH", "model.h5")  # put model.h5 in repo root
+# Load the trained model safely (no compile to avoid extra deps)
+@st.cache_resource
+def load_cifar10_model():
+    return tf.keras.models.load_model("model.h5", compile=False)
+
+model = load_cifar10_model()
+
+# Streamlit UI
+st.title("CIFAR-10 Image Classification")
+st.write("Upload an image and let the model predict its class.")
+
+uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
+
+if uploaded_file is not None:
+    # Show uploaded image
+    image = Image.open(uploaded_file).resize((32, 32))
+    st.image(image, caption="Uploaded Image", use_container_width=True)
+
+    # Preprocess image
+    img_array = np.array(image).astype("float32") / 255.0
+    img_array = np.expand_dims(img_array, axis=0)  # Add batch dimension
+
+    # Predict
+    prediction = model.predict(img_array)
+    predicted_class = class_names[np.argmax(prediction)]
+
+    st.subheader(f"Prediction: **{predicted_class}**")
+    st.bar_chart(prediction[0])
+
 
 # -------------------------------
 # Utilities
